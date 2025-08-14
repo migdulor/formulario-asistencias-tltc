@@ -139,9 +139,8 @@ Verifica:
         
         console.log('📋 Headers:', result.data[0]);
         
-        // Procesar jugadoras
+        // Procesar jugadoras (sin filtrar por nombre vacío)
         const jugadorasExtraidas = result.data.slice(1).map((fila, index) => {
-          console.log(`📝 Procesando fila ${index + 1}:`, fila);
           return {
             id: index + 1,
             idJugadora: fila[0]?.toString().trim() || (index + 1).toString(),
@@ -149,7 +148,7 @@ Verifica:
             nombreCorto: fila[2]?.toString().trim() || '',
             division: fila[3]?.toString().trim() || ''
           };
-        }).filter(jugadora => jugadora.nombre && jugadora.nombre !== '');
+        });
         
         console.log('✅ Jugadoras procesadas:', jugadorasExtraidas);
         setJugadoras(jugadorasExtraidas);
@@ -403,7 +402,14 @@ const PaginaDebug = ({ scriptUrl }) => {
 
 // Página de Asistencias
 const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
+  const [mensajeGuardado, setMensajeGuardado] = useState("");
+  // Usar fecha local (no UTC) para evitar desfase de día
+  const getLocalDateString = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(getLocalDateString());
   const [divisionFiltro, setDivisionFiltro] = useState('todas');
   const [asistencias, setAsistencias] = useState({});
   const [jugadoras, setJugadoras] = useState(jugadorasProps);
@@ -442,6 +448,11 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
 
   return (
     <div className="space-y-6">
+      {mensajeGuardado && (
+        <div className={`px-4 py-2 rounded text-center text-sm ${mensajeGuardado.startsWith('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {mensajeGuardado}
+        </div>
+      )}
       <div className="bg-white p-4 md:p-6 rounded-lg shadow">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -571,13 +582,41 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
       </div>
 
       {jugadoras.length > 0 && (
-        <button
-          onClick={() => alert('Funcionalidad de guardado será implementada una vez que las jugadoras se carguen correctamente')}
-          disabled={Object.keys(asistencias).length === 0}
-          className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          Guardar en Google Sheets ({Object.keys(asistencias).length} marcadas)
-        </button>
+        <>
+          <button
+            onClick={async () => {
+              setMensajeGuardado("");
+              try {
+                const response = await fetch(SCRIPT_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: new URLSearchParams({
+                    action: 'saveAttendance',
+                    fecha: fechaSeleccionada,
+                    asistencias: JSON.stringify(asistencias)
+                  })
+                });
+                const result = await response.json();
+                if (result.success) {
+                  setMensajeGuardado('✅ Asistencias guardadas en Google Sheets');
+                } else {
+                  setMensajeGuardado('❌ Error al guardar: ' + (result.message || 'Error desconocido'));
+                }
+              } catch (error) {
+                setMensajeGuardado('❌ Error de red: ' + error.message);
+              }
+            }}
+            disabled={Object.keys(asistencias).length === 0}
+            className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Guardar en Google Sheets ({Object.keys(asistencias).length} marcadas)
+          </button>
+          {mensajeGuardado && (
+            <div className={`mt-4 px-4 py-2 rounded text-center text-sm ${mensajeGuardado.startsWith('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {mensajeGuardado}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
