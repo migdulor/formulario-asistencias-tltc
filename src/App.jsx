@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Save, Download, TrendingUp, Shield, ChevronRight, Home, BarChart, FileText, Clock, MapPin, Trophy, X } from 'lucide-react';
 
-// URL del Google Apps Script
+// URL del Google Apps Script - ACTUALIZA ESTA URL CON TU NUEVA URL
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxG6YJ03xM1VGlQCzmEGz3wkWgnjw9Sy4cKLCA91QPckIxsBbdS9eBh7PUxO6C-vOehug/exec';
 
 // Componente principal con navegación
@@ -10,61 +10,91 @@ const App = () => {
   const [jugadoras, setJugadoras] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorInfo, setErrorInfo] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
-    cargarJugadoras();
+    // Probar conexión básica primero
+    probarConexionBasica();
   }, []);
+
+  const probarConexionBasica = async () => {
+    try {
+      console.log('🧪 Probando conexión básica...');
+      setDebugInfo('Probando conexión...');
+      
+      const response = await fetch(SCRIPT_URL);
+      const text = await response.text();
+      
+      console.log('🔗 Respuesta de conexión básica:', {
+        status: response.status,
+        text: text.substring(0, 200)
+      });
+      
+      if (response.ok && text.trim() !== '') {
+        setDebugInfo('✅ Conexión OK - Cargando jugadoras...');
+        cargarJugadoras();
+      } else {
+        setErrorInfo(`Conexión básica falló. Status: ${response.status}, Respuesta: "${text}"`);
+      }
+    } catch (error) {
+      console.error('❌ Error de conexión básica:', error);
+      setErrorInfo(`Error de conexión: ${error.message}`);
+    }
+  };
 
   const cargarJugadoras = async () => {
     try {
       setIsLoading(true);
       setErrorInfo('');
       console.log('🔄 Iniciando carga de jugadoras...');
-      console.log('📡 URL de script:', SCRIPT_URL);
       
       const requestUrl = `${SCRIPT_URL}?action=read&timestamp=${Date.now()}`;
-      console.log('🌐 URL completa:', requestUrl);
+      console.log('🌐 URL de petición:', requestUrl);
       
       const response = await fetch(requestUrl, {
         method: 'GET',
-        mode: 'cors',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+        mode: 'cors'
       });
       
-      console.log('📊 Response status:', response.status);
-      console.log('📊 Response statusText:', response.statusText);
-      console.log('📊 Response ok:', response.ok);
-      console.log('📊 Response type:', response.type);
-      console.log('📊 Response url:', response.url);
-      
-      // Verificar headers de respuesta
-      console.log('📋 Response headers:');
-      for (let [key, value] of response.headers.entries()) {
-        console.log(`   ${key}: ${value}`);
-      }
+      console.log('📊 Response details:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: [...response.headers.entries()]
+      });
       
       if (!response.ok) {
-        throw new Error(`❌ HTTP error: ${response.status} - ${response.statusText}`);
+        throw new Error(`HTTP error: ${response.status} - ${response.statusText}`);
       }
       
-      // Obtener texto de respuesta
       const text = await response.text();
-      console.log('📄 Response text length:', text.length);
-      console.log('📄 Response text (first 500 chars):', text.substring(0, 500));
-      console.log('📄 Response text (last 100 chars):', text.substring(Math.max(0, text.length - 100)));
+      console.log('📄 Response text details:', {
+        length: text.length,
+        isEmpty: text.trim() === '',
+        first200: text.substring(0, 200),
+        last200: text.substring(Math.max(0, text.length - 200))
+      });
       
-      // Verificar si la respuesta está vacía
       if (!text || text.trim() === '') {
-        throw new Error('❌ La respuesta del servidor está vacía. Verifica que el Google Apps Script esté funcionando correctamente.');
+        throw new Error(`La respuesta del Google Apps Script está vacía. 
+
+Posibles soluciones:
+1. Verifica que el SHEET_ID esté configurado en el Apps Script
+2. Re-implementa el Apps Script como "Aplicación web" 
+3. Asegúrate de que el acceso sea "Cualquier persona"
+4. Ejecuta la función testManual() en el Apps Script
+
+URL probada: ${requestUrl}`);
       }
       
-      // Verificar si la respuesta contiene HTML (error común)
       if (text.trim().startsWith('<')) {
-        console.error('🚨 La respuesta parece ser HTML, no JSON:', text.substring(0, 200));
-        throw new Error('❌ El servidor devolvió HTML en lugar de JSON. Esto indica un problema con el Google Apps Script o sus permisos.');
+        throw new Error(`El servidor devolvió HTML en lugar de JSON. Esto indica:
+
+1. El Google Apps Script no está implementado correctamente
+2. Problemas de permisos
+3. Error en el código del script
+
+Respuesta HTML recibida: ${text.substring(0, 300)}...`);
       }
       
       let result;
@@ -73,79 +103,94 @@ const App = () => {
         console.log('✅ JSON parseado exitosamente:', result);
       } catch (parseError) {
         console.error('❌ Error al parsear JSON:', parseError);
-        console.error('📄 Texto que causó el error:', text);
-        throw new Error(`❌ La respuesta no es un JSON válido. Error: ${parseError.message}. Respuesta recibida: "${text.substring(0, 100)}..."`);
-      }
-      
-      // Verificar estructura de respuesta
-      console.log('🔍 Analizando respuesta:', {
-        success: result.success,
-        message: result.message,
-        code: result.code,
-        hasData: !!result.data,
-        dataType: typeof result.data,
-        dataLength: Array.isArray(result.data) ? result.data.length : 'no es array'
-      });
-      
-      if (result.code === 403 || result.message === 'permission error') {
-        throw new Error('🚫 No tienes permisos para acceder a la API. Verifica que el script esté publicado como "Cualquier persona" puede ejecutar.');
+        throw new Error(`Error al parsear JSON: ${parseError.message}
+
+Respuesta recibida: "${text.substring(0, 500)}..."
+
+Verifica que el Google Apps Script esté devolviendo JSON válido.`);
       }
       
       if (!result.success) {
-        throw new Error(`❌ Error del servidor: ${result.message || 'Error desconocido'}`);
+        throw new Error(`Error del Google Apps Script: ${result.message || 'Error desconocido'}
+
+Verifica:
+1. Que el SHEET_ID esté configurado correctamente
+2. Que la hoja "Jugadoras" exista
+3. Los logs del Google Apps Script para más detalles`);
       }
       
       if (result.success && result.data) {
-        console.log('📊 Data received:', result.data);
+        console.log('📊 Datos recibidos:', result.data);
         
-        // Verificar que result.data sea un array
         if (!Array.isArray(result.data)) {
-          console.error('❌ Los datos no son un array:', typeof result.data, result.data);
-          throw new Error('❌ Los datos recibidos no tienen el formato esperado (no es un array)');
+          throw new Error(`Los datos no son un array: ${typeof result.data}`);
         }
-        
-        console.log(`📊 Datos recibidos: ${result.data.length} filas`);
         
         if (result.data.length === 0) {
-          throw new Error('❌ La hoja de Google Sheets está vacía');
+          throw new Error('La hoja de Google Sheets está vacía');
         }
         
-        // Mostrar headers
-        console.log('📋 Headers de la hoja:', result.data[0]);
+        console.log('📋 Headers:', result.data[0]);
         
-        // Extraer jugadoras (saltamos la primera fila que contiene headers)
         const jugadorasExtraidas = result.data.slice(1).map((fila, index) => {
           console.log(`📝 Procesando fila ${index + 1}:`, fila);
           return {
             id: index + 1,
-            idJugadora: fila[0]?.toString() || '',
-            nombre: fila[1] || '',
-            nombreCorto: fila[2] || '', // Nombre corto desde columna C
-            division: fila[3] || ''
+            idJugadora: fila[0]?.toString().trim() || '',
+            nombre: fila[1]?.toString().trim() || '',
+            nombreCorto: fila[2]?.toString().trim() || '',
+            division: fila[3]?.toString().trim() || ''
           };
-        }).filter(jugadora => {
-          const esValida = jugadora.nombre && jugadora.nombre.trim() !== '';
-          if (!esValida) {
-            console.log('⚠️ Jugadora filtrada (nombre vacío):', jugadora);
-          }
-          return esValida;
-        });
+        }).filter(jugadora => jugadora.nombre && jugadora.nombre !== '');
         
-        console.log('✅ Jugadoras extraídas:', jugadorasExtraidas);
+        console.log('✅ Jugadoras procesadas:', jugadorasExtraidas);
         setJugadoras(jugadorasExtraidas);
+        setDebugInfo(`✅ ${jugadorasExtraidas.length} jugadoras cargadas exitosamente`);
         setErrorInfo('');
         
         if (jugadorasExtraidas.length === 0) {
-          setErrorInfo('⚠️ No se encontraron jugadoras válidas en los datos. Verifica que la hoja tenga datos en las columnas correctas.');
+          setErrorInfo('No se encontraron jugadoras válidas en los datos');
         }
       } else {
-        console.error('❌ Respuesta sin datos válidos:', result);
-        throw new Error('❌ La respuesta no contiene datos válidos');
+        throw new Error('La respuesta no contiene datos válidos');
       }
     } catch (error) {
-      console.error('💥 Error detallado:', error);
+      console.error('💥 Error completo:', error);
       setErrorInfo(error.message);
-      alert(`❌ Error al cargar jugadoras: ${error.message}`);
+      setDebugInfo(`❌ Error: ${error.message.split('\n')[0]}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const probarURL = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🧪 Probando URL directamente...');
+      
+      // Test 1: Sin parámetros
+      console.log('Test 1: Sin parámetros');
+      const response1 = await fetch(SCRIPT_URL);
+      const text1 = await response1.text();
+      console.log('Resultado 1:', { status: response1.status, text: text1.substring(0, 200) });
+      
+      // Test 2: Con action=test
+      console.log('Test 2: Con action=test');
+      const response2 = await fetch(`${SCRIPT_URL}?action=test`);
+      const text2 = await response2.text();
+      console.log('Resultado 2:', { status: response2.status, text: text2.substring(0, 200) });
+      
+      // Test 3: Con action=read
+      console.log('Test 3: Con action=read');
+      const response3 = await fetch(`${SCRIPT_URL}?action=read`);
+      const text3 = await response3.text();
+      console.log('Resultado 3:', { status: response3.status, text: text3.substring(0, 200) });
+      
+      alert('Tests completados. Revisa la consola para los resultados.');
+      
+    } catch (error) {
+      console.error('Error en tests:', error);
+      alert(`Error en tests: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +198,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header con navegación */}
       <header className="bg-blue-900 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -166,19 +210,27 @@ const App = () => {
             </div>
             <div className="text-right">
               <p className="text-sm">
-                {isLoading ? '🔄 Cargando...' : `✅ ${jugadoras.length} jugadoras cargadas`}
+                {isLoading ? '🔄 Cargando...' : debugInfo || `${jugadoras.length} jugadoras`}
               </p>
-              <button 
-                onClick={cargarJugadoras}
-                disabled={isLoading}
-                className="text-xs text-blue-200 hover:text-white underline disabled:opacity-50"
-              >
-                🔄 Recargar datos
-              </button>
+              <div className="flex gap-2 text-xs">
+                <button 
+                  onClick={cargarJugadoras}
+                  disabled={isLoading}
+                  className="text-blue-200 hover:text-white underline disabled:opacity-50"
+                >
+                  🔄 Recargar
+                </button>
+                <button 
+                  onClick={probarURL}
+                  disabled={isLoading}
+                  className="text-blue-200 hover:text-white underline disabled:opacity-50"
+                >
+                  🧪 Test URL
+                </button>
+              </div>
             </div>
           </div>
           
-          {/* Navegación */}
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-2">
             <button
               onClick={() => setCurrentPage('asistencias')}
@@ -192,127 +244,140 @@ const App = () => {
               Asistencias
             </button>
             <button
-              onClick={() => setCurrentPage('estadisticas')}
+              onClick={() => setCurrentPage('debug')}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors min-w-max ${
-                currentPage === 'estadisticas' 
+                currentPage === 'debug' 
                   ? 'bg-blue-700 text-white' 
                   : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
               }`}
             >
-              <BarChart className="w-4 h-4" />
-              Estadísticas
-            </button>
-            <button
-              onClick={() => setCurrentPage('formacion')}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors min-w-max ${
-                currentPage === 'formacion' 
-                  ? 'bg-blue-700 text-white' 
-                  : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
-              }`}
-            >
-              <Trophy className="w-4 h-4" />
-              Formación
+              🔧 Debug
             </button>
           </nav>
         </div>
       </header>
 
-      {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Mensajes de error/estado */}
-        {(jugadoras.length === 0 && !isLoading) && (
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-            <strong>⚠️ Atención:</strong> No se han cargado las jugadoras. 
-            <button 
-              onClick={cargarJugadoras}
-              className="ml-2 underline hover:no-underline"
-            >
-              🔄 Intentar cargar nuevamente
-            </button>
+        {errorInfo && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <strong>❌ Error:</strong>
+            <pre className="mt-2 text-sm whitespace-pre-wrap">{errorInfo}</pre>
+            <div className="mt-3 pt-3 border-t border-red-300 flex gap-2">
+              <button 
+                onClick={cargarJugadoras}
+                className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+              >
+                🔄 Reintentar
+              </button>
+              <button 
+                onClick={probarURL}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                🧪 Probar URL
+              </button>
+            </div>
           </div>
         )}
 
-        {errorInfo && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <strong>❌ Error:</strong> {errorInfo}
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm underline">Ver detalles técnicos</summary>
-              <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
-                <p><strong>URL del script:</strong> {SCRIPT_URL}</p>
-                <p><strong>Abre la consola del navegador (F12)</strong> para ver logs detallados</p>
-              </div>
-            </details>
+        {(jugadoras.length === 0 && !isLoading && !errorInfo) && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+            <strong>⚠️ No hay jugadoras cargadas.</strong>
+            <div className="mt-2">
+              <button 
+                onClick={cargarJugadoras}
+                className="bg-yellow-600 text-white px-4 py-2 rounded text-sm hover:bg-yellow-700 mr-2"
+              >
+                🔄 Cargar jugadoras
+              </button>
+              <button 
+                onClick={probarURL}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                🧪 Probar conexión
+              </button>
+            </div>
           </div>
         )}
         
         {currentPage === 'asistencias' && <PaginaAsistencias jugadoras={jugadoras} />}
-        {currentPage === 'estadisticas' && <PaginaEstadisticas jugadoras={jugadoras} />}
-        {currentPage === 'formacion' && <PaginaFormacion jugadoras={jugadoras} />}
+        {currentPage === 'debug' && <PaginaDebug scriptUrl={SCRIPT_URL} />}
       </main>
     </div>
   );
 };
 
-// Página de Asistencias (resto del código igual)
+// Página de Debug
+const PaginaDebug = ({ scriptUrl }) => {
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-bold mb-4">🔧 Información de Debug</h2>
+        
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold mb-2">URL del Google Apps Script:</h3>
+            <div className="bg-gray-100 p-3 rounded font-mono text-sm break-all">
+              {scriptUrl}
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold mb-2">URLs de prueba:</h3>
+            <div className="space-y-2 text-sm">
+              <div>
+                <strong>Test básico:</strong>
+                <br />
+                <a href={scriptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                  {scriptUrl}
+                </a>
+              </div>
+              <div>
+                <strong>Test de conexión:</strong>
+                <br />
+                <a href={`${scriptUrl}?action=test`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                  {scriptUrl}?action=test
+                </a>
+              </div>
+              <div>
+                <strong>Leer jugadoras:</strong>
+                <br />
+                <a href={`${scriptUrl}?action=read`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                  {scriptUrl}?action=read
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-bold text-blue-900 mb-2">📝 Pasos de verificación:</h3>
+        <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+          <li>Haz clic en las URLs de arriba para verificar que devuelvan JSON</li>
+          <li>Si devuelven HTML o están vacías, re-implementa el Google Apps Script</li>
+          <li>Verifica que el SHEET_ID esté configurado en el script</li>
+          <li>Ejecuta testManual() en el Google Apps Script</li>
+          <li>Asegúrate de que el acceso sea "Cualquier persona"</li>
+        </ol>
+      </div>
+    </div>
+  );
+};
+
+// Página de Asistencias
 const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   const [divisionFiltro, setDivisionFiltro] = useState('todas');
   const [asistencias, setAsistencias] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [mensaje, setMensaje] = useState('');
   const [jugadoras, setJugadoras] = useState(jugadorasProps);
-  const [cargandoAsistencias, setCargandoAsistencias] = useState(false);
 
   useEffect(() => {
     setJugadoras(jugadorasProps);
-    if (jugadorasProps.length > 0) {
-      cargarAsistenciasFecha(fechaSeleccionada);
-    }
   }, [jugadorasProps]);
-
-  useEffect(() => {
-    if (jugadoras.length > 0) {
-      cargarAsistenciasFecha(fechaSeleccionada);
-    }
-  }, [fechaSeleccionada, jugadoras]);
 
   const jugadorasFiltradas = jugadoras.filter(jugadora => 
     divisionFiltro === 'todas' || jugadora.division === divisionFiltro
   );
-
-  const cargarAsistenciasFecha = async (fecha) => {
-    try {
-      setCargandoAsistencias(true);
-      const params = new URLSearchParams({
-        action: 'readByDate',
-        fecha: fecha
-      });
-      
-      const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.asistencias) {
-          const nuevasAsistencias = {};
-          Object.keys(result.asistencias).forEach(jugadoraId => {
-            const estado = result.asistencias[jugadoraId];
-            switch (estado) {
-              case 'P': nuevasAsistencias[jugadoraId] = 'presente'; break;
-              case 'A': nuevasAsistencias[jugadoraId] = 'ausente'; break;
-              case 'T': nuevasAsistencias[jugadoraId] = 'tardanza'; break;
-            }
-          });
-          setAsistencias(nuevasAsistencias);
-        } else {
-          setAsistencias({});
-        }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setCargandoAsistencias(false);
-    }
-  };
 
   const handleAsistenciaChange = (jugadoraId, estado) => {
     setAsistencias(prev => ({
@@ -329,69 +394,6 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
     setAsistencias(prev => ({ ...prev, ...nuevasAsistencias }));
   };
 
-  const guardarEnGoogleSheets = async () => {
-    try {
-      setIsLoading(true);
-      setMensaje('💾 Guardando asistencias...');
-      
-      // Preparar datos de asistencia
-      const asistenciasData = {};
-      Object.keys(asistencias).forEach(jugadoraId => {
-        const estado = asistencias[jugadoraId];
-        switch (estado) {
-          case 'presente': asistenciasData[jugadoraId] = 'P'; break;
-          case 'ausente': asistenciasData[jugadoraId] = 'A'; break;
-          case 'tardanza': asistenciasData[jugadoraId] = 'T'; break;
-        }
-      });
-      
-      if (Object.keys(asistenciasData).length === 0) {
-        setMensaje('⚠️ No hay asistencias marcadas');
-        setIsLoading(false);
-        return;
-      }
-
-      const params = new URLSearchParams({
-        action: 'saveAttendance',
-        fecha: fechaSeleccionada,
-        asistencias: JSON.stringify(asistenciasData)
-      });
-      
-      const response = await fetch(`${SCRIPT_URL}?${params.toString()}`, {
-        method: 'POST',
-        mode: 'cors'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
-      
-      const text = await response.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error('La respuesta no es un JSON válido');
-      }
-      
-      if (result.code === 403 || result.message === 'permission error') {
-        throw new Error('No tienes permisos para guardar los datos');
-      }
-      
-      if (result.success) {
-        setMensaje('✅ Asistencias guardadas exitosamente');
-        setTimeout(() => setMensaje(''), 3000);
-      } else {
-        throw new Error(result.message || 'Error al guardar las asistencias');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setMensaje(`❌ Error: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const contarAsistencias = () => {
     const presentes = Object.values(asistencias).filter(e => e === 'presente').length;
     const ausentes = Object.values(asistencias).filter(e => e === 'ausente').length;
@@ -403,16 +405,6 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
 
   return (
     <div className="space-y-6">
-      {mensaje && (
-        <div className={`p-4 rounded-lg ${
-          mensaje.includes('❌') || mensaje.includes('⚠️') 
-            ? 'bg-red-100 text-red-800' 
-            : 'bg-green-100 text-green-800'
-        }`}>
-          {mensaje}
-        </div>
-      )}
-
       <div className="bg-white p-4 md:p-6 rounded-lg shadow">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -474,13 +466,16 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="max-h-96 overflow-y-auto">
-          {cargandoAsistencias ? (
+          {jugadoras.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Cargando asistencias...
-            </div>
-          ) : jugadoras.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No hay jugadoras cargadas. Verifica la conexión con Google Sheets.
+              <div className="mb-4">
+                <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                <p className="text-lg font-medium">No hay jugadoras cargadas</p>
+                <p className="text-sm">Verifica la conexión con Google Sheets</p>
+              </div>
+              <p className="text-xs text-gray-400">
+                Ve a la pestaña "Debug" para más información
+              </p>
             </div>
           ) : jugadorasFiltradas.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
@@ -490,4 +485,65 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
             jugadorasFiltradas.map((jugadora) => (
               <div key={jugadora.id} className="px-4 py-3 border-b hover:bg-gray-50 flex flex-col sm:flex-row justify-between">
                 <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                    jugadora.division === '7ma' ? 'bg-blue-500' : 'bg-purple-500'
+                  }`}>
+                    {jugadora.idJugadora}
+                  </div>
+                  <div>
+                    <div className="font-medium">{jugadora.nombre}</div>
+                    <div className="text-sm text-gray-500">{jugadora.division}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'presente')}
+                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
+                      asistencias[jugadora.idJugadora] === 'presente'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-100 hover:bg-green-100'
+                    }`}
+                  >
+                    Presente
+                  </button>
+                  <button
+                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'tardanza')}
+                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
+                      asistencias[jugadora.idJugadora] === 'tardanza'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-100 hover:bg-yellow-100'
+                    }`}
+                  >
+                    Tardanza
+                  </button>
+                  <button
+                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'ausente')}
+                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
+                      asistencias[jugadora.idJugadora] === 'ausente'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-100 hover:bg-red-100'
+                    }`}
+                  >
+                    Ausente
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {jugadoras.length > 0 && (
+        <button
+          onClick={() => alert('Funcionalidad de guardado será implementada una vez que las jugadoras se carguen correctamente')}
+          disabled={Object.keys(asistencias).length === 0}
+          className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          Guardar en Google Sheets ({Object.keys(asistencias).length} marcadas)
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default App;
