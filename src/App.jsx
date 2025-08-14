@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Save, Download, TrendingUp, Shield, ChevronRight, Home, BarChart, FileText, Clock, MapPin, Trophy, X } from 'lucide-react';
 
 // URL del Google Apps Script
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxG6YJ03xM1VGlQCzmEGz3wkWgnjw9Sy4cKLCA91QPckIxsBbdS9eBh7PUxO6C-vOehug/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0bZ-wUA-p_1byFQcClwlkUk2GvxOCTxBd2pwmm5s1wU3v0lEdSEr-nTPtanpDaIMKog/exec';
 
 // Componente principal con navegación
 const App = () => {
