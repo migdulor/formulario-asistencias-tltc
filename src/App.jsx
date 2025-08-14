@@ -9,6 +9,7 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState('asistencias');
   const [jugadoras, setJugadoras] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorInfo, setErrorInfo] = useState('');
 
   useEffect(() => {
     cargarJugadoras();
@@ -17,48 +18,104 @@ const App = () => {
   const cargarJugadoras = async () => {
     try {
       setIsLoading(true);
-      console.log('Intentando cargar jugadoras...');
+      setErrorInfo('');
+      console.log('🔄 Iniciando carga de jugadoras...');
+      console.log('📡 URL de script:', SCRIPT_URL);
       
-      const response = await fetch(`${SCRIPT_URL}?action=read`, {
+      const requestUrl = `${SCRIPT_URL}?action=read&timestamp=${Date.now()}`;
+      console.log('🌐 URL completa:', requestUrl);
+      
+      const response = await fetch(requestUrl, {
         method: 'GET',
-        mode: 'cors'
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
       
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
+      console.log('📊 Response status:', response.status);
+      console.log('📊 Response statusText:', response.statusText);
+      console.log('📊 Response ok:', response.ok);
+      console.log('📊 Response type:', response.type);
+      console.log('📊 Response url:', response.url);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status} - ${response.statusText}`);
+      // Verificar headers de respuesta
+      console.log('📋 Response headers:');
+      for (let [key, value] of response.headers.entries()) {
+        console.log(`   ${key}: ${value}`);
       }
       
+      if (!response.ok) {
+        throw new Error(`❌ HTTP error: ${response.status} - ${response.statusText}`);
+      }
+      
+      // Obtener texto de respuesta
       const text = await response.text();
-      console.log('Response text:', text);
+      console.log('📄 Response text length:', text.length);
+      console.log('📄 Response text (first 500 chars):', text.substring(0, 500));
+      console.log('📄 Response text (last 100 chars):', text.substring(Math.max(0, text.length - 100)));
+      
+      // Verificar si la respuesta está vacía
+      if (!text || text.trim() === '') {
+        throw new Error('❌ La respuesta del servidor está vacía. Verifica que el Google Apps Script esté funcionando correctamente.');
+      }
+      
+      // Verificar si la respuesta contiene HTML (error común)
+      if (text.trim().startsWith('<')) {
+        console.error('🚨 La respuesta parece ser HTML, no JSON:', text.substring(0, 200));
+        throw new Error('❌ El servidor devolvió HTML en lugar de JSON. Esto indica un problema con el Google Apps Script o sus permisos.');
+      }
       
       let result;
       try {
         result = JSON.parse(text);
-      } catch (e) {
-        console.error('JSON parse error:', e);
-        throw new Error(`La respuesta no es un JSON válido: ${text.substring(0, 100)}...`);
+        console.log('✅ JSON parseado exitosamente:', result);
+      } catch (parseError) {
+        console.error('❌ Error al parsear JSON:', parseError);
+        console.error('📄 Texto que causó el error:', text);
+        throw new Error(`❌ La respuesta no es un JSON válido. Error: ${parseError.message}. Respuesta recibida: "${text.substring(0, 100)}..."`);
       }
       
-      console.log('Parsed result:', result);
+      // Verificar estructura de respuesta
+      console.log('🔍 Analizando respuesta:', {
+        success: result.success,
+        message: result.message,
+        code: result.code,
+        hasData: !!result.data,
+        dataType: typeof result.data,
+        dataLength: Array.isArray(result.data) ? result.data.length : 'no es array'
+      });
       
       if (result.code === 403 || result.message === 'permission error') {
-        throw new Error('No tienes permisos para acceder a la API. Verifica que el script esté publicado como "Cualquier persona" puede ejecutar.');
+        throw new Error('🚫 No tienes permisos para acceder a la API. Verifica que el script esté publicado como "Cualquier persona" puede ejecutar.');
+      }
+      
+      if (!result.success) {
+        throw new Error(`❌ Error del servidor: ${result.message || 'Error desconocido'}`);
       }
       
       if (result.success && result.data) {
-        console.log('Data received:', result.data);
+        console.log('📊 Data received:', result.data);
         
         // Verificar que result.data sea un array
         if (!Array.isArray(result.data)) {
-          throw new Error('Los datos recibidos no tienen el formato esperado (no es un array)');
+          console.error('❌ Los datos no son un array:', typeof result.data, result.data);
+          throw new Error('❌ Los datos recibidos no tienen el formato esperado (no es un array)');
         }
+        
+        console.log(`📊 Datos recibidos: ${result.data.length} filas`);
+        
+        if (result.data.length === 0) {
+          throw new Error('❌ La hoja de Google Sheets está vacía');
+        }
+        
+        // Mostrar headers
+        console.log('📋 Headers de la hoja:', result.data[0]);
         
         // Extraer jugadoras (saltamos la primera fila que contiene headers)
         const jugadorasExtraidas = result.data.slice(1).map((fila, index) => {
-          console.log(`Procesando fila ${index + 1}:`, fila);
+          console.log(`📝 Procesando fila ${index + 1}:`, fila);
           return {
             id: index + 1,
             idJugadora: fila[0]?.toString() || '',
@@ -66,21 +123,29 @@ const App = () => {
             nombreCorto: fila[2] || '', // Nombre corto desde columna C
             division: fila[3] || ''
           };
-        }).filter(jugadora => jugadora.nombre && jugadora.nombre.trim() !== '');
+        }).filter(jugadora => {
+          const esValida = jugadora.nombre && jugadora.nombre.trim() !== '';
+          if (!esValida) {
+            console.log('⚠️ Jugadora filtrada (nombre vacío):', jugadora);
+          }
+          return esValida;
+        });
         
-        console.log('Jugadoras extraídas:', jugadorasExtraidas);
+        console.log('✅ Jugadoras extraídas:', jugadorasExtraidas);
         setJugadoras(jugadorasExtraidas);
+        setErrorInfo('');
         
         if (jugadorasExtraidas.length === 0) {
-          console.warn('No se encontraron jugadoras válidas en los datos');
+          setErrorInfo('⚠️ No se encontraron jugadoras válidas en los datos. Verifica que la hoja tenga datos en las columnas correctas.');
         }
       } else {
-        console.error('Error en la respuesta:', result);
-        throw new Error(result.message || 'Error al cargar los datos desde Google Sheets');
+        console.error('❌ Respuesta sin datos válidos:', result);
+        throw new Error('❌ La respuesta no contiene datos válidos');
       }
     } catch (error) {
-      console.error('Error detallado:', error);
-      alert(`Error al cargar jugadoras: ${error.message}`);
+      console.error('💥 Error detallado:', error);
+      setErrorInfo(error.message);
+      alert(`❌ Error al cargar jugadoras: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -101,13 +166,14 @@ const App = () => {
             </div>
             <div className="text-right">
               <p className="text-sm">
-                {isLoading ? 'Cargando...' : `${jugadoras.length} jugadoras cargadas`}
+                {isLoading ? '🔄 Cargando...' : `✅ ${jugadoras.length} jugadoras cargadas`}
               </p>
               <button 
                 onClick={cargarJugadoras}
-                className="text-xs text-blue-200 hover:text-white underline"
+                disabled={isLoading}
+                className="text-xs text-blue-200 hover:text-white underline disabled:opacity-50"
               >
-                Recargar datos
+                🔄 Recargar datos
               </button>
             </div>
           </div>
@@ -153,15 +219,29 @@ const App = () => {
 
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {jugadoras.length === 0 && !isLoading && (
+        {/* Mensajes de error/estado */}
+        {(jugadoras.length === 0 && !isLoading) && (
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-            <strong>Atención:</strong> No se han cargado las jugadoras. 
+            <strong>⚠️ Atención:</strong> No se han cargado las jugadoras. 
             <button 
               onClick={cargarJugadoras}
               className="ml-2 underline hover:no-underline"
             >
-              Intentar cargar nuevamente
+              🔄 Intentar cargar nuevamente
             </button>
+          </div>
+        )}
+
+        {errorInfo && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <strong>❌ Error:</strong> {errorInfo}
+            <details className="mt-2">
+              <summary className="cursor-pointer text-sm underline">Ver detalles técnicos</summary>
+              <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
+                <p><strong>URL del script:</strong> {SCRIPT_URL}</p>
+                <p><strong>Abre la consola del navegador (F12)</strong> para ver logs detallados</p>
+              </div>
+            </details>
           </div>
         )}
         
@@ -173,7 +253,7 @@ const App = () => {
   );
 };
 
-// Página de Asistencias
+// Página de Asistencias (resto del código igual)
 const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   const [divisionFiltro, setDivisionFiltro] = useState('todas');
@@ -410,114 +490,4 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
             jugadorasFiltradas.map((jugadora) => (
               <div key={jugadora.id} className="px-4 py-3 border-b hover:bg-gray-50 flex flex-col sm:flex-row justify-between">
                 <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                    jugadora.division === '7ma' ? 'bg-blue-500' : 'bg-purple-500'
-                  }`}>
-                    {jugadora.idJugadora}
-                  </div>
-                  <div>
-                    <div className="font-medium">{jugadora.nombre}</div>
-                    <div className="text-sm text-gray-500">{jugadora.division}</div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'presente')}
-                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
-                      asistencias[jugadora.idJugadora] === 'presente'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 hover:bg-green-100'
-                    }`}
-                  >
-                    Presente
-                  </button>
-                  <button
-                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'tardanza')}
-                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
-                      asistencias[jugadora.idJugadora] === 'tardanza'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-gray-100 hover:bg-yellow-100'
-                    }`}
-                  >
-                    Tardanza
-                  </button>
-                  <button
-                    onClick={() => handleAsistenciaChange(jugadora.idJugadora, 'ausente')}
-                    className={`px-3 py-1 rounded text-sm flex-1 min-w-[90px] ${
-                      asistencias[jugadora.idJugadora] === 'ausente'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-gray-100 hover:bg-red-100'
-                    }`}
-                  >
-                    Ausente
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      <button
-        onClick={guardarEnGoogleSheets}
-        disabled={isLoading || jugadoras.length === 0}
-        className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
-      >
-        {isLoading ? 'Guardando...' : 'Guardar en Google Sheets'}
-      </button>
-    </div>
-  );
-};
-
-// Página de Estadísticas (componente simplificado para resolver el problema principal)
-const PaginaEstadisticas = ({ jugadoras }) => {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Estadísticas de Asistencia</h2>
-        <p className="text-gray-600">
-          Esta sección mostrará las estadísticas de asistencia una vez que tengas datos guardados.
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          Total de jugadoras registradas: {jugadoras.length}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-// Página de Formación (componente simplificado para resolver el problema principal)
-const PaginaFormacion = ({ jugadoras }) => {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Formación de Equipo</h2>
-        <p className="text-gray-600">
-          Esta sección permitirá crear formaciones para los partidos.
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          Jugadoras disponibles: {jugadoras.length}
-        </p>
-        <div className="mt-4">
-          <h3 className="font-semibold mb-2">Jugadoras por División:</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-blue-50 p-3 rounded">
-              <p className="font-medium text-blue-800">7ma División</p>
-              <p className="text-blue-600">
-                {jugadoras.filter(j => j.division === '7ma').length} jugadoras
-              </p>
-            </div>
-            <div className="bg-purple-50 p-3 rounded">
-              <p className="font-medium text-purple-800">6ta División</p>
-              <p className="text-purple-600">
-                {jugadoras.filter(j => j.division === '6ta').length} jugadoras
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default App;
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text
