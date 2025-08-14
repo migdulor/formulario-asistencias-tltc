@@ -18,20 +18,31 @@ const App = () => {
     try {
       setIsLoading(true);
       const response = await fetch(`${SCRIPT_URL}?action=read`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          const jugadorasExtraidas = result.data.slice(1).map((fila, index) => ({
-            id: index + 1,
-            idJugadora: fila[0]?.toString() || '',
-            nombre: fila[1] || '',
-            nombreCorto: fila[2] || '', // Nombre corto desde columna C
-            division: fila[3] || ''
-          })).filter(jugadora => jugadora.nombre);
-          setJugadoras(jugadorasExtraidas);
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error('La respuesta no es un JSON válido');
+      }
+      if (result.code === 403 || result.message === 'permission error') {
+        throw new Error('No tienes permisos para acceder a la API');
+      }
+      if (result.success && result.data) {
+        const jugadorasExtraidas = result.data.slice(1).map((fila, index) => ({
+          id: index + 1,
+          idJugadora: fila[0]?.toString() || '',
+          nombre: fila[1] || '',
+          nombreCorto: fila[2] || '', // Nombre corto desde columna C
+          division: fila[3] || ''
+        })).filter(jugadora => jugadora.nombre);
+        setJugadoras(jugadorasExtraidas);
       }
     } catch (error) {
+      alert(error.message);
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
@@ -178,50 +189,45 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
     try {
       setIsLoading(true);
       setMensaje('💾 Guardando asistencias...');
-      
-      const asistenciasData = {};
-      jugadoras.forEach(jugadora => {
-        const estado = asistencias[jugadora.idJugadora];
-        if (estado) {
-          let valorAsistencia = '';
-          switch (estado) {
-            case 'presente': valorAsistencia = 'P'; break;
-            case 'ausente': valorAsistencia = 'A'; break;
-            case 'tardanza': valorAsistencia = 'T'; break;
-          }
-          if (valorAsistencia) {
-            asistenciasData[jugadora.idJugadora] = valorAsistencia;
-          }
-        }
-      });
-      
+      // ...existing code para preparar asistenciasData...
       if (Object.keys(asistenciasData).length === 0) {
         setMensaje('⚠️ No hay asistencias marcadas');
         setIsLoading(false);
         return;
       }
-      
       const params = new URLSearchParams({
-        action: 'write',
-        fecha: fechaSeleccionada,
-        asistencias: JSON.stringify(asistenciasData)
+        action: 'readByDate',
+        fecha: fecha
       });
-      
       const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setMensaje(`✅ Asistencias guardadas para ${fechaSeleccionada}`);
-          // No limpiar asistencias para permitir ediciones adicionales
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error('La respuesta no es un JSON válido');
+      }
+      if (result.code === 403 || result.message === 'permission error') {
+        throw new Error('No tienes permisos para acceder a la API');
+      }
+      if (result.success && result.asistencias) {
+        const nuevasAsistencias = {};
+        Object.keys(result.asistencias).forEach(jugadoraId => {
+          const estado = result.asistencias[jugadoraId];
+          switch (estado) {
+            case 'P': nuevasAsistencias[jugadoraId] = 'presente'; break;
+            case 'A': nuevasAsistencias[jugadoraId] = 'ausente'; break;
+            case 'T': nuevasAsistencias[jugadoraId] = 'tardanza'; break;
+          }
+        });
+        setAsistencias(nuevasAsistencias);
       }
     } catch (error) {
+      alert(error.message);
       console.error('Error:', error);
-      setMensaje('❌ Error al guardar');
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => setMensaje(''), 3000);
     }
   };
 
@@ -799,14 +805,25 @@ const PaginaFormacion = ({ jugadoras }) => {
       
       const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
       
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setMensaje('✅ Formación guardada exitosamente');
-          setTimeout(() => setMensaje(''), 3000);
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error('La respuesta no es un JSON válido');
+      }
+      if (result.code === 403 || result.message === 'permission error') {
+        throw new Error('No tienes permisos para acceder a la API');
+      }
+      if (result.success) {
+        setMensaje('✅ Formación guardada exitosamente');
+        setTimeout(() => setMensaje(''), 3000);
       }
     } catch (error) {
+      alert(error.message);
       console.error('Error:', error);
       setMensaje('❌ Error al guardar la formación');
     }
