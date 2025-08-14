@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Save, Download, TrendingUp, Shield, ChevronRight, Home, BarChart, FileText, Clock, MapPin, Trophy, X } from 'lucide-react';
 
-// URL del Google Apps Script - ACTUALIZA ESTA URL CON TU NUEVA URL
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxG6YJ03xM1VGlQCzmEGz3wkWgnjw9Sy4cKLCA91QPckIxsBbdS9eBh7PUxO6C-vOehug/exec';
+// ⚠️ ACTUALIZA ESTA URL CON LA URL REAL DE TU GOOGLE APPS SCRIPT ⚠️
+// Debe ser algo como: https://script.google.com/macros/s/ABC123.../exec
+const SCRIPT_URL = 'REEMPLAZA_CON_TU_URL_REAL';
 
 // Componente principal con navegación
 const App = () => {
@@ -13,6 +14,12 @@ const App = () => {
   const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
+    // Verificar URL configurada
+    if (SCRIPT_URL === 'REEMPLAZA_CON_TU_URL_REAL') {
+      setErrorInfo('⚠️ CONFIGURACIÓN REQUERIDA: Debes actualizar la SCRIPT_URL en src/App.jsx con la URL real de tu Google Apps Script.');
+      return;
+    }
+    
     // Probar conexión básica primero
     probarConexionBasica();
   }, []);
@@ -132,11 +139,12 @@ Verifica:
         
         console.log('📋 Headers:', result.data[0]);
         
+        // Procesar jugadoras
         const jugadorasExtraidas = result.data.slice(1).map((fila, index) => {
           console.log(`📝 Procesando fila ${index + 1}:`, fila);
           return {
             id: index + 1,
-            idJugadora: fila[0]?.toString().trim() || '',
+            idJugadora: fila[0]?.toString().trim() || (index + 1).toString(),
             nombre: fila[1]?.toString().trim() || '',
             nombreCorto: fila[2]?.toString().trim() || '',
             division: fila[3]?.toString().trim() || ''
@@ -215,14 +223,14 @@ Verifica:
               <div className="flex gap-2 text-xs">
                 <button 
                   onClick={cargarJugadoras}
-                  disabled={isLoading}
+                  disabled={isLoading || SCRIPT_URL === 'REEMPLAZA_CON_TU_URL_REAL'}
                   className="text-blue-200 hover:text-white underline disabled:opacity-50"
                 >
                   🔄 Recargar
                 </button>
                 <button 
                   onClick={probarURL}
-                  disabled={isLoading}
+                  disabled={isLoading || SCRIPT_URL === 'REEMPLAZA_CON_TU_URL_REAL'}
                   className="text-blue-200 hover:text-white underline disabled:opacity-50"
                 >
                   🧪 Test URL
@@ -262,24 +270,26 @@ Verifica:
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             <strong>❌ Error:</strong>
             <pre className="mt-2 text-sm whitespace-pre-wrap">{errorInfo}</pre>
-            <div className="mt-3 pt-3 border-t border-red-300 flex gap-2">
-              <button 
-                onClick={cargarJugadoras}
-                className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
-              >
-                🔄 Reintentar
-              </button>
-              <button 
-                onClick={probarURL}
-                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
-              >
-                🧪 Probar URL
-              </button>
-            </div>
+            {SCRIPT_URL !== 'REEMPLAZA_CON_TU_URL_REAL' && (
+              <div className="mt-3 pt-3 border-t border-red-300 flex gap-2">
+                <button 
+                  onClick={cargarJugadoras}
+                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                >
+                  🔄 Reintentar
+                </button>
+                <button 
+                  onClick={probarURL}
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                >
+                  🧪 Probar URL
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {(jugadoras.length === 0 && !isLoading && !errorInfo) && (
+        {(jugadoras.length === 0 && !isLoading && !errorInfo && SCRIPT_URL !== 'REEMPLAZA_CON_TU_URL_REAL') && (
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
             <strong>⚠️ No hay jugadoras cargadas.</strong>
             <div className="mt-2">
@@ -308,6 +318,8 @@ Verifica:
 
 // Página de Debug
 const PaginaDebug = ({ scriptUrl }) => {
+  const urlConfigurada = scriptUrl !== 'REEMPLAZA_CON_TU_URL_REAL';
+  
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow">
@@ -315,50 +327,75 @@ const PaginaDebug = ({ scriptUrl }) => {
         
         <div className="space-y-4">
           <div>
+            <h3 className="font-semibold mb-2">Estado de configuración:</h3>
+            <div className={`p-3 rounded font-mono text-sm ${
+              urlConfigurada 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {urlConfigurada ? '✅ URL configurada' : '❌ URL no configurada'}
+            </div>
+          </div>
+          
+          <div>
             <h3 className="font-semibold mb-2">URL del Google Apps Script:</h3>
             <div className="bg-gray-100 p-3 rounded font-mono text-sm break-all">
               {scriptUrl}
             </div>
           </div>
           
-          <div>
-            <h3 className="font-semibold mb-2">URLs de prueba:</h3>
-            <div className="space-y-2 text-sm">
-              <div>
-                <strong>Test básico:</strong>
-                <br />
-                <a href={scriptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
-                  {scriptUrl}
-                </a>
-              </div>
-              <div>
-                <strong>Test de conexión:</strong>
-                <br />
-                <a href={`${scriptUrl}?action=test`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
-                  {scriptUrl}?action=test
-                </a>
-              </div>
-              <div>
-                <strong>Leer jugadoras:</strong>
-                <br />
-                <a href={`${scriptUrl}?action=read`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
-                  {scriptUrl}?action=read
-                </a>
+          {urlConfigurada && (
+            <div>
+              <h3 className="font-semibold mb-2">URLs de prueba:</h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <strong>Test básico:</strong>
+                  <br />
+                  <a href={scriptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                    {scriptUrl}
+                  </a>
+                </div>
+                <div>
+                  <strong>Test de conexión:</strong>
+                  <br />
+                  <a href={`${scriptUrl}?action=test`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                    {scriptUrl}?action=test
+                  </a>
+                </div>
+                <div>
+                  <strong>Leer jugadoras:</strong>
+                  <br />
+                  <a href={`${scriptUrl}?action=read`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                    {scriptUrl}?action=read
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
       
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="font-bold text-blue-900 mb-2">📝 Pasos de verificación:</h3>
-        <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-          <li>Haz clic en las URLs de arriba para verificar que devuelvan JSON</li>
-          <li>Si devuelven HTML o están vacías, re-implementa el Google Apps Script</li>
-          <li>Verifica que el SHEET_ID esté configurado en el script</li>
-          <li>Ejecuta testManual() en el Google Apps Script</li>
-          <li>Asegúrate de que el acceso sea "Cualquier persona"</li>
-        </ol>
+      <div className={`p-4 rounded-lg ${urlConfigurada ? 'bg-blue-50' : 'bg-red-50'}`}>
+        <h3 className={`font-bold mb-2 ${urlConfigurada ? 'text-blue-900' : 'text-red-900'}`}>
+          {urlConfigurada ? '📝 Pasos de verificación:' : '⚠️ Configuración requerida:'}
+        </h3>
+        {urlConfigurada ? (
+          <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+            <li>Haz clic en las URLs de arriba para verificar que devuelvan JSON</li>
+            <li>Si devuelven HTML o están vacías, re-implementa el Google Apps Script</li>
+            <li>Verifica que el SHEET_ID esté configurado en el script</li>
+            <li>Ejecuta testManual() en el Google Apps Script</li>
+            <li>Asegúrate de que el acceso sea "Cualquier persona"</li>
+          </ol>
+        ) : (
+          <ol className="text-sm text-red-800 space-y-1 list-decimal list-inside">
+            <li>Ve a tu Google Apps Script</li>
+            <li>Implementar → Administrar implementaciones</li>
+            <li>Copia la URL de la aplicación web</li>
+            <li>Actualiza la línea SCRIPT_URL en src/App.jsx</li>
+            <li>Guarda y recarga la aplicación</li>
+          </ol>
+        )}
       </div>
     </div>
   );
@@ -492,7 +529,7 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
                   </div>
                   <div>
                     <div className="font-medium">{jugadora.nombre}</div>
-                    <div className="text-sm text-gray-500">{jugadora.division}</div>
+                    <div className="text-sm text-gray-500">{jugadora.division} • {jugadora.nombreCorto}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
