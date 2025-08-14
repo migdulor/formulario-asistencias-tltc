@@ -469,6 +469,55 @@ const PaginaAsistencias = ({ jugadoras: jugadorasProps }) => {
   );
 };
 
-// Continuaré con las otras páginas en el próximo fragmento...
+// Página de Estadísticas (componente simplificado para resolver el problema principal)
+const PaginaEstadisticas = ({ jugadoras }) => {
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-bold mb-4">Estadísticas de Asistencia</h2>
+        <p className="text-gray-600">
+          Esta sección mostrará las estadísticas de asistencia una vez que tengas datos guardados.
+        </p>
+        <p className="text-sm text-gray-500 mt-2">
+          Total de jugadoras registradas: {jugadoras.length}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Página de Formación (componente simplificado para resolver el problema principal)
+const PaginaFormacion = ({ jugadoras }) => {
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-bold mb-4">Formación de Equipo</h2>
+        <p className="text-gray-600">
+          Esta sección permitirá crear formaciones para los partidos.
+        </p>
+        <p className="text-sm text-gray-500 mt-2">
+          Jugadoras disponibles: {jugadoras.length}
+        </p>
+        <div className="mt-4">
+          <h3 className="font-semibold mb-2">Jugadoras por División:</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 p-3 rounded">
+              <p className="font-medium text-blue-800">7ma División</p>
+              <p className="text-blue-600">
+                {jugadoras.filter(j => j.division === '7ma').length} jugadoras
+              </p>
+            </div>
+            <div className="bg-purple-50 p-3 rounded">
+              <p className="font-medium text-purple-800">6ta División</p>
+              <p className="text-purple-600">
+                {jugadoras.filter(j => j.division === '6ta').length} jugadoras
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default App;
