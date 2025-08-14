@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Users, Save, Download, TrendingUp, Shield, ChevronRight, Home, BarChart, FileText, Clock, MapPin, Trophy, X } from 'lucide-react';
 
 // URL del Google Apps Script
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0bZ-wUA-p_1byFQcClwlkUk2GvxOCTxBd2pwmm5s1wU3v0lEdSEr-nTPtanpDaIMKog/exec';
+//const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0bZ-wUA-p_1byFQcClwlkUk2GvxOCTxBd2pwmm5s1wU3v0lEdSEr-nTPtanpDaIMKog/exec';
 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5Q9jKYGhvT6nDDGefSwRGzXrLo-5uDMJ06PldG-YJIstY-UEl0Q86x4DF2Cs9zLMtag/exec'
 // Componente principal con navegación
 const App = () => {
   const [currentPage, setCurrentPage] = useState('asistencias');
